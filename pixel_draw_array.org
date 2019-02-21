@@ -4,8 +4,13 @@
 
 * Links
 
+  - "serializers = _.extend" "ipywidgets" "deserialize" "serialize" "BaseModel.serializers"
+
+  - https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20Low%20Level.html#Low-Level-Widget-Tutorial
+  - https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20Low%20Level.html
+  -
   - https://stackoverflow.com/questions/51452398/how-to-use-arraybuffers-with-dataviews-in-javascript
-  - 
+  -
   - https://gist.github.com/maartenbreddels/40fa030fdb922e6d2074282ceed6b753
   - https://www.html5rocks.com/en/tutorials/webgl/typed_arrays/
   - https://github.com/wolfv/jupyter-canvas-widget/blob/master/js/lib/fastcanvas.js
@@ -113,9 +118,17 @@ class IpyPixelDrawWidget(widgets.DOMWidget):
     _view_module_version = Unicode("0.0.0").tag(sync=True)
 
     # Attributes
-    canvas_data = Array( default_value=default_array, allow_none=True, help="Array holding canvas content.").tag( sync=True, **array_binary_serialization, )
+    canvas_data = Array(
+        default_value=default_array,
+        allow_none=True,
+        help="Array holding canvas content.",
+    ).tag( sync=True, **array_binary_serialization, )
 
-    pix_zoom = Integer(36, help="Pixel zoom coefficient.").tag(sync=True)
+    pix_zoom = Integer(
+        default_value=36,
+        allow_none=False,
+        help="Pixel zoom coefficient.",
+        ).tag(sync=True)
 
     @validate("pix_zoom")
     def _valid_pix_zoom(self, proposal):
@@ -130,7 +143,7 @@ class IpyPixelDrawWidget(widgets.DOMWidget):
 
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
-    %%javascript
+%%javascript
 require.undef("ipyPixelDraw")
 
 define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
@@ -140,7 +153,8 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
             return null;
         console.log("binary array")
         window.last_data = data
-        var ar = new Float32Array(data.data.buffer)
+        // var ar = new Float32Array(data.data.buffer)
+        var ar = new Int32Array(data.data.buffer)
         window.last_array = ar
         return {data:ar, shape:data.shape, nested:data.nested}
     }
@@ -149,15 +163,6 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
         console.log("serialize")
         return data;//[0,9]
     }
-
-
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.log(widgets.WidgetModel.serializers)
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
 
     var ipyPixelDraw_view = widgets.DOMWidgetView.extend(
@@ -173,8 +178,10 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
                         return array_rough.reduce((acc, val) => Array.isArray(val) ? acc.concat(arrayFlattenRecursive(val)) : acc.concat(val), []);
                     }
                     output_flat = arrayFlattenRecursive( output_flat );
-                    this.canvas_data_serialized = {data: new DataView( (new Int32Array( output_flat ) ).buffer ), shape: [7,5] }
+                    this.canvas_data_serialized = { data: new DataView( (new Int32Array( output_flat ) ).buffer ), shape: [7,5] }
+                    // this.canvas_data_serialized = { data: new Int32Array( output_flat ).buffer, shape: [7,5] }
                     // { dtype: 'int32' }
+                    // value = {buffer: new Float32Array([1,2,3]).buffer, shape: [3]}
 
                     console.log("+++++++++++++++++++++++++++++++++++++++++++++");
                     console.log("Running: this.serializeCanvasData");
@@ -633,8 +640,8 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
                 console.log("Running: btn_push_clicked_from_js");
                 console.log("---------------------------------------------");
                 this.serializeCanvasData();
-                this.model.set("canvas_data", this.canvas_data_serialized );
-                this.model.save_changes();
+                // this.model.set("canvas_data", this.canvas_data_serialized );
+                // this.model.save_changes();
             },
 
             canvas_data_changed_from_js: function() {
@@ -657,17 +664,21 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
 
             },
 
+
+
         },
+
         {
             serializers: _.extend({
-                x1: { deserialize: deserialize_numpy_array, serialize: serialize_numpy_array  },
-                x2: { deserialize: deserialize_numpy_array, serialize: serialize_numpy_array },
-            }, widgets.WidgetModel.serializers)
+                canvas_data: {
+                    deserialize: deserialize_numpy_array,
+                    serialize:     serialize_numpy_array },
+            }, widgets.WidgetModel.serializers ) // widgets.WidgetModel.serializers // BaseModel.serializers
         }
 
 
-
     );
+
 
     return {IpyPixelDrawView: ipyPixelDraw_view};
 
@@ -685,7 +696,7 @@ pix_1 = IpyPixelDrawWidget(  )
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 pix_1
-  
+
   #+END_SRC
 
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
@@ -732,7 +743,7 @@ pix_1.canvas_data = np.array( [
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 pix_1.canvas_data
-  
+
   #+END_SRC
 
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
