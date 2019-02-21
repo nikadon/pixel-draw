@@ -3,38 +3,32 @@
 
 
 
-
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 from __future__ import print_function
-from traitlets import Integer, Unicode, Bool, validate, TraitError
+from traitlets import Integer, Unicode, Bool, validate, TraitError, CInt, CFloat
+from traittypes import Array
+
 from ipywidgets import widgets, DOMWidget, register
-import numpy as np
-
-from traittypes import Array
-
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-import ipywidgets as widgets
 import IPython
-
-from traitlets import Unicode, validate, CInt, CFloat
-from traittypes import Array
-
+import numpy as np
 import logging
 import time
-import numpy as np
 import math
+
+from base64 import b64encode
+import warnings
+
+from traittypes import Array
 
 try:
   from io import BytesIO as StringIO # python3
 except:
   from StringIO import StringIO # python2
 
-from base64 import b64encode
-import warnings
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 def from_json(value, obj=None):
   return []
@@ -68,9 +62,8 @@ def array_to_list(ar, obj=None):
 def list_to_array(list, obj=None):
     return np.array(list, dtype=np.float32)
 
-array_binary_serialization = dict(to_json=array_to_binary, from_json=binary_to_array)
-
-array_json_serialization = dict(to_json=array_to_list, from_json=list_to_array)
+array_binary_serialization = dict(to_json=array_to_binary, from_json=binary_to_array, )
+array_json_serialization   = dict(to_json=array_to_list,   from_json=list_to_array,   )
 
   #+END_SRC
 
@@ -121,7 +114,7 @@ class IpyPixelDrawWidget(widgets.DOMWidget):
 
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
-%%javascript
+    %%javascript
 require.undef("ipyPixelDraw")
 
 define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
@@ -208,22 +201,34 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
                     console.log( this.canvas_data_cols_count );
 
                     if ( !Array.isArray( this.canvas_data_basicArray ) ) {
-                        throw new Error( "parseCanvasData: argument `this.canvas_data_basicArray` should be an array" );
+                        throw new Error( "parseCanvasData: \
+                        argument `this.canvas_data_basicArray` \
+                        should be an array" );
                     }
                     if ( this.canvas_data_basicArray.length === 0 ) {
-                        throw new Error( "parseCanvasData: argument `this.canvas_data_basicArray` should be a non-empty array" );
+                        throw new Error( "parseCanvasData: \
+                        argument `this.canvas_data_basicArray` \
+                        should be a non-empty array" );
                     }
                     if ( !Array.isArray( this.canvas_data_shapeArray ) ) {
-                        throw new Error( "parseCanvasData: argument `this.canvas_data_shapeArray` should be an array" );
+                        throw new Error( "parseCanvasData: \
+                        argument `this.canvas_data_shapeArray` \
+                        should be an array" );
                     }
                     if ( this.canvas_data_shapeArray.length === 0 ) {
-                        throw new Error( "parseCanvasData: argument `this.canvas_data_shapeArray` should be a non-empty array" );
+                        throw new Error( "parseCanvasData: \
+                        argument `this.canvas_data_shapeArray` \
+                        should be a non-empty array" );
                     }
                     if ( this.canvas_data_shapeArray.some( x => Array.isArray(x) ) ) {
-                        throw new Error( "parseCanvasData: argument `this.canvas_data_shapeArray` should be a flat (1d) array" );
+                        throw new Error( "parseCanvasData: \
+                        argument `this.canvas_data_shapeArray` \
+                        should be a flat (1d) array" );
                     }
                     if ( !this.canvas_data_shapeArray.every( x => ( Number.isInteger(x) ) && ( x > 0 ) ) ) {
-                        throw new Error( "parseCanvasData: argument argument `this.canvas_data_shapeArray` should contain only positive (>0) integers" );
+                        throw new Error( "parseCanvasData: \
+                        argument argument `this.canvas_data_shapeArray` \
+                        should contain only positive (>0) integers" );
                     }
                     // arrayFlattenRecursive
                     function arrayFlattenRecursive( array_rough ) {
@@ -231,7 +236,10 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
                     }
                     this.canvas_data_basicArray = arrayFlattenRecursive( this.canvas_data_basicArray );
                     if ( this.canvas_data_basicArray.length !== this.canvas_data_shapeArray.reduce( (a,b) => a * b ) ) {
-                        throw new Error( "parseCanvasData: the length of `this.canvas_data_basicArray` should be equal to the product of the elements of `this.canvas_data_shapeArray`" );
+                        throw new Error( "parseCanvasData: \
+                        the length of `this.canvas_data_basicArray` \
+                        should be equal to the product of the elements of \
+                        `this.canvas_data_shapeArray`" );
                     }
                     // arrayChunkify
                     function arrayChunkify( array_in,  chunk_len ) {
@@ -467,23 +475,43 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
                 console.log("==============================");
 
                 this.canvas = document.createElement("canvas");
-                this.canvas.style  = "border: 1px solid " + this.col_bord + "; border-radius: 2px; margin: 0px 16px 16px 0px; float: left; ";
+                this.canvas.style  = "\
+                    border: 1px solid " + this.col_bord + "; \
+                    border-radius: 2px; \
+                    margin: 0px 16px 16px 0px; \
+                    float: left; \
+                    ";
                 this.canvas.width  = this.canvas_w;
                 this.canvas.height = this.canvas_h;
                 this.contxt = this.canvas.getContext('2d');
 
                 this.sketch = document.createElement("div");
                 this.sketch.setAttribute( "class", "pixel-draw-sketch" );
-                this.sketch.style = "background: #f3f3f3; border: 1px solid #cccccc; border-radius: 2px; padding: 16px 16px 16px 16px; margin: 0px 16px 16px 0px; float: left; ";
+                this.sketch.style = "\
+                    background: #f3f3f3; \
+                    border: 1px solid #cccccc; \
+                    border-radius: 2px; \
+                    padding: 16px 16px 16px 16px; \
+                    margin: 0px 16px 16px 0px; \
+                    float: left; \
+                    ";
                 this.sketch.innerHTML = "OK";
 
                 this.block_controls = document.createElement("div");
                 this.block_controls = document.createElement("div");
                 this.block_controls.setAttribute("class", "pixel-draw-controls");
-                this.block_controls.style = "background: #f3f3f3; border: 1px solid red; border-radius: 2px; padding: 16px 16px 16px 16px; margin: 0px 16px 16px 0px; float: left; ";
+                this.block_controls.style = "\
+                    background: #f3f3f3; \
+                    border: 1px solid red; \
+                    border-radius: 2px; \
+                    padding: 16px 16px 16px 16px; \
+                    margin: 0px 16px 16px 0px; \
+                    float: left; \
+                    ";
 
                 this.block_pix_zoom = document.createElement("div");
-                this.block_pix_zoom.style = "display: flex; align-items: center;";
+                this.block_pix_zoom.style = "\
+                display: flex; align-items: center;";
 
                 this.label_pix_zoom = document.createElement("label");
                 this.label_pix_zoom.innerHTML = "<pre>pix_zoom: </pre>";
@@ -537,7 +565,7 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
 
 
                 // ---------------------------------------------------------------------------
-                // Append DOM ellements
+                // Append DOM elements
                 // ---------------------------------------------------------------------------
 
                 this.el.append(this.canvas);
@@ -641,24 +669,27 @@ define("ipyPixelDraw", ["@jupyter-widgets/base", ], function(widgets) {
                 // this.drawCanvasContent();
 
             },
-
-
-
         },
-
         {
-            serializers: _.extend({
-                canvas_data: {
-                    deserialize: deserialize_numpy_array,
-                    serialize:     serialize_numpy_array },
-            }, widgets.WidgetModel.serializers ) // widgets.WidgetModel.serializers // BaseModel.serializers
+            serializers: _.extend(
+                {
+                    canvas_data:
+                    {
+                        deserialize: deserialize_numpy_array,
+                        serialize:     serialize_numpy_array
+                    },
+                }, widgets.WidgetModel.serializers ) // widgets.WidgetModel.serializers // BaseModel.serializers
         }
 
 
     );
 
 
-    return {IpyPixelDrawView: ipyPixelDraw_view};
+
+
+
+
+    return { IpyPixelDrawView: ipyPixelDraw_view };
 
 })
 
