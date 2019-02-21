@@ -2,28 +2,6 @@
 #+AUTHOR: JN, KR
 
 
-* Links
-
-  - "serializers = _.extend" "ipywidgets" "deserialize" "serialize" "BaseModel.serializers"
-
-  - https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20Low%20Level.html#Low-Level-Widget-Tutorial
-  - https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20Low%20Level.html
-  -
-  - https://stackoverflow.com/questions/51452398/how-to-use-arraybuffers-with-dataviews-in-javascript
-  -
-  - https://gist.github.com/maartenbreddels/40fa030fdb922e6d2074282ceed6b753
-  - https://www.html5rocks.com/en/tutorials/webgl/typed_arrays/
-  - https://github.com/wolfv/jupyter-canvas-widget/blob/master/js/lib/fastcanvas.js
-  - https://www.geeksforgeeks.org/memoryview-in-python/
-  - https://developer.mozilla.org/pl/docs/Web/JavaScript/Referencje/Obiekty/DataView
-  - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays
-  - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint32Array
-  - https://0fps.net/2013/05/22/implementing-multidimensional-arrays-in-javascript/
-  - https://github.com/scijs/ndarray
-
-
-* Code
-
 
 
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
