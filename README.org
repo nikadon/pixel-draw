@@ -1,3 +1,5 @@
 
 
-[[./pixel-draw.png]]
+Pixel Draw-n-ing Pad
+
+[[./pixel-drawning-pad.png]]
