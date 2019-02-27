@@ -1,4 +1,4 @@
-#+TITLE: pixel_drawning_pad_002_rot90_fixed.org
+#+TITLE: pixel_drawning_pad.org
 #+AUTHOR: JN, KR
 
 
@@ -797,7 +797,7 @@ inst.noisify( gridVal=1 )
   #+END_SRC
 
 
-* Extra controls
+* TODO Extra controls
 
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
@@ -878,3 +878,8 @@ display(inst)
 display(ctrl)
 
   #+END_SRC
+* Comments
+
+  TODO:
+  - Update of the HTML np.array view is working only on the most recent display of the widget
+  - Key strokes handling (js/html side) for arrows and basic functionalities
