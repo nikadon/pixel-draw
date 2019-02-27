@@ -1,0 +1,880 @@
+#+TITLE: pixel_drawning_pad_002_rot90_fixed.org
+#+AUTHOR: JN, KR
+
+
+* Code
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+from ipywidgets import Widget
+Widget.close_all()
+
+from __future__ import print_function
+from traitlets import Integer, Unicode, Bool, validate, TraitError, List
+from ipywidgets import widgets, DOMWidget, register
+
+import numpy as np
+
+from traittypes import Array
+
+  #+END_SRC
+
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+import ipywidgets as widgets
+from traitlets import Unicode, Float, List
+
+from copy import deepcopy
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+def from_json(value, obj=None):
+    return []
+
+def array_to_binary(ar, obj=None):
+    if ar is not None:
+        ar = ar.astype(np.float32)
+        mv = memoryview(ar)
+        return {"data": mv, "shape": ar.shape}
+    else:
+        return None
+
+last_value = None
+setters = 0
+
+def binary_to_array(value, obj=None):
+    global last_value, setters
+    setters += 1
+    last_value = value # or keep a reference to a global for debugging
+    return np.frombuffer( value["data"], dtype=np.float32 ).reshape( value["shape"] )
+
+
+array_binary_serialization = dict(to_json=array_to_binary, from_json=binary_to_array)
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+@widgets.register
+class DrawningPad(widgets.DOMWidget):
+    """An example widget."""
+    _view_name = Unicode("DrawningView").tag(sync=True)
+    _model_name = Unicode("DrawningModel").tag(sync=True)
+    _view_module = Unicode("jupyter-drawning-pad").tag(sync=True)
+    _model_module = Unicode("jupyter-drawning-pad").tag(sync=True)
+    _view_module_version = Unicode("~0.1.6").tag(sync=True)
+    _model_module_version = Unicode("~0.1.6").tag(sync=True)
+    value = Unicode("Bye World!").tag(sync=True)
+
+    canvas01_data_default = np.array( [
+        [ 1, 1, 0, 0, 0, 0, 0, ],
+        [ 1, 0, 0, 1, 0, 0, 0, ],
+        [ 0, 0, 1, 1, 1, 0, 0, ],
+        [ 0, 0, 0, 1, 0, 0, 0, ],
+        [ 0, 0, 1, 1, 1, 0, 0, ],
+        [ 0, 0, 0, 1, 0, 0, 0, ],
+        [ 0, 0, 0, 0, 0, 0, 0, ],
+    ], )
+
+    # canvas01_data_default = np.arange(25).reshape(5,5)
+
+    canvas01_data = Array(
+        default_value=canvas01_data_default,
+        allow_none=True,
+        help="Array holding canvas content.",
+    ).tag(
+        sync=True, **array_binary_serialization )
+
+    pix_zoom = Integer(
+        default_value=36,
+        allow_none=False,
+        help="Pixel zoom coefficient.",
+    ).tag(sync=True)
+
+    @validate("pix_zoom")
+    def _valid_pix_zoom(self, proposal):
+        if proposal["value"] <= 8:
+            raise TraitError("Please ensure that 8 <= pix_zoom < 128")
+        if proposal["value"] > 128:
+            raise TraitError("Please ensure that 8 <= pix_zoom < 128")
+        return proposal["value"]
+
+
+    def clear( self, w=7, h=7, ):
+        self.canvas01_data = np.zeros( (h,w) ).copy()
+
+    def clean( self, w=7, h=7, ):
+        self.canvas01_data = np.zeros( (h,w) ).copy()
+
+    def test( self, ):
+        self.canvas01_data = np.array( [
+        [ 1, 1, 0, 0, 0, 0, 0, ],
+        [ 1, 0, 0, 1, 0, 0, 0, ],
+        [ 0, 0, 1, 1, 1, 0, 0, ],
+        [ 0, 0, 0, 1, 0, 0, 0, ],
+        [ 0, 0, 1, 1, 1, 0, 0, ],
+        [ 0, 0, 0, 1, 0, 0, 0, ],
+        [ 0, 0, 0, 0, 0, 0, 0, ],
+    ], )
+
+    def roll( self, x=1, y=1, ):
+        self.canvas01_data = np.roll( self.canvas01_data, x, axis=1, )
+        self.canvas01_data = np.roll( self.canvas01_data, y, axis=0, )
+
+    def rot90( self ):
+        self.canvas01_data = np.rot90( self.canvas01_data, k=1 , axes=(0, 1), ).copy()
+
+    def flipud( self ):
+        self.canvas01_data = np.flipud( self.canvas01_data, )
+
+    def fliplr( self ):
+        self.canvas01_data = np.fliplr( self.canvas01_data, )
+
+    def transpose( self ):
+        self.canvas01_data = np.transpose( self.canvas01_data, ).copy()
+
+    def checkerboard( self, nRows=7, nCols=7, ):
+        self.canvas01_data = np.array([[(x+y)%2 for x in range(nCols)] for y in range(nRows)]).copy()
+
+    def swap( self ):
+        data = self.canvas01_data.copy()
+        for ii, row in enumerate(data):
+            for jj, elem in enumerate(row):
+                if elem == 0:
+                    data[ii][jj] = 1
+                elif elem == 1:
+                    data[ii][jj] = 0
+                else:
+                    pass
+        self.canvas01_data = data.copy()
+
+    def noisify( self, gridVal=1 ):
+        mask = np.random.rand(*self.canvas01_data.shape)
+        data = self.canvas01_data.copy()
+        thresh = 0.95
+        mask[mask >= thresh] = 1
+        mask[mask <  thresh] = 0
+        mask = mask.astype( np.bool )
+        data[mask] = gridVal
+        self.canvas01_data = data.copy()
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+%%javascript
+require.undef("jupyter-drawning-pad")
+
+define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
+
+    function deserialize_numpy_array( array_to_deserialize, manager ) {
+        console.log("RUNNING: deserialize_numpy_array()")
+        if( array_to_deserialize == null ) {
+            console.log("...deserializing a null array")
+            return null;
+        }
+        console.log("...deserializing a binary array")
+        window.last_array_to_deserialize = array_to_deserialize
+        var array_typedTypeArray = new Float32Array( array_to_deserialize.data.buffer )
+        window.last_array_typedTypeArray = array_typedTypeArray
+        return { data: array_typedTypeArray, shape: array_to_deserialize.shape }
+    }
+
+    function serialize_numpy_array( array_to_serialize, m ) {
+        console.log("RUNNING: serialize_numpy_array()")
+        return array_to_serialize;
+    }
+
+    // THE MODEL
+    var DrawningModel = widgets.DOMWidgetModel.extend({
+        defaults: _.extend(widgets.DOMWidgetModel.prototype.defaults(), {
+            _model_name: "DrawningModel",
+            _view_name:  "DrawningView",
+            _model_module: "jupyter-drawning-pad",
+            _view_module:  "jupyter-drawning-pad",
+            _model_module_version: "0.1.6",
+            _view_module_version:  "0.1.6",
+            value: "Bye World!"
+        })
+
+    }, {
+        serializers: _.extend({
+            canvas01_data: { deserialize: deserialize_numpy_array, serialize: serialize_numpy_array  },
+        }, widgets.WidgetModel.serializers)
+    });
+
+    // THE VIEW
+    var DrawningView = widgets.DOMWidgetView.extend({
+        render: function () {
+
+            console.log("=============================================");
+            console.log("=============================================");
+            console.log("=============================================");
+            console.log("Creating html");
+            console.log("=============================================");
+            console.log("=============================================");
+            console.log("=============================================");
+
+            this.sketch01 = document.createElement("div");
+            this.sketch01.style  = "\
+                width: 300; \
+                height: 300; \
+                border: 1px solid red; \
+                background-color: none; \
+                border-radius: 0px; \
+                margin:   0px  0px  0px  0px; \
+                padding: 18px  0px  0px 18px; \
+                float: left; \
+                ";
+
+            this.canvas01 = document.createElement("canvas");
+            this.canvas01.setAttribute("class", "drawning-pad-canvas01");
+            this.canvas01.style  = "\
+                border: 4px solid #220044; \
+                border-radius: 4px; \
+                margin:  0px 0px 0px 0px; \
+                padding: 0px 0px 0px 0px; \
+                float: left; \
+                ";
+
+            this.contxt01 = this.canvas01.getContext("2d");
+
+            this.block_canvas01 = document.createElement("div");
+            this.block_canvas01.innerHTML = "";
+            this.block_canvas01.style = "\
+                background: none; \
+                border: none; \
+                padding: 0px  0px  0px  0px; \
+                margin:  0px 18px 18px  0px; \
+                float: left; \
+                ";
+
+            this.block_auxItems = document.createElement("div");
+            this.block_auxItems.innerHTML = "";
+            this.block_auxItems.style = "\
+                background: none; \
+                border: none; \
+                padding: 0px  0px  0px  0px; \
+                margin:  0px  0px  0px  0px; \
+                float: left; \
+                ";
+
+            this.block_htmlized = document.createElement("div");
+            this.block_htmlized.innerHTML = "htmlized";
+            this.block_htmlized.style = "\
+                font-size: 10pt; \
+                font-family: monospace; \
+                white-space: pre; \
+                color: black; \
+                background: #f3f3f3; \
+                border: 1px solid red; \
+                border-radius: 2px; \
+                padding: 18px 18px 18px 18px; \
+                margin: 0px 18px 18px 0px; \
+                ";
+
+            this.block_controls = document.createElement("div");
+            this.block_controls.style = "\
+                color: black; \
+                background: #f3f3f3; \
+                border: 1px solid red; \
+                border-radius: 2px; \
+                padding: 18px 18px 18px 18px; \
+                margin: 0px 18px 18px 0px; \
+                ";
+
+            this.block_pix_zoom = document.createElement("div");
+            this.block_pix_zoom.style = "\
+                display: flex; \
+                align-items: center; \
+                ";
+
+            this.label_pix_zoom = document.createElement("label");
+            this.label_pix_zoom.innerHTML = "pix_zoom: ";
+            this.label_pix_zoom.style = "\
+                font-size: 10pt; \
+                font-family: monospace; \
+                white-space: pre; \
+                color: black; \
+                ";
+
+            this.input_pix_zoom          = document.createElement("input");
+            this.input_pix_zoom.type     = "number";
+            this.input_pix_zoom.value    = this.model.get("pix_zoom");
+            this.input_pix_zoom.min      = 8;
+            this.input_pix_zoom.max      = 128;
+            this.input_pix_zoom.step     = 1;
+            this.input_pix_zoom.disabled = false;
+            this.input_pix_zoom.style = "\
+                font-size: 10pt; \
+                font-family: monospace; \
+                width: 96px; \
+                white-space: pre; \
+                color: black; \
+                background-color: silver; \
+                ";
+
+            // /////////////////////////////////////////////
+            var that = this;
+            // /////////////////////////////////////////////
+
+            that.col_fore = "#a6e22e";
+            that.col_back = "#663399";
+            that.col_grid = "#220044";
+            that.col_bord = "#ffff00";
+            that.col_curs = "#ff0066";
+
+            window.canvas01 = that.canvas01;
+            window.contxt01 = that.contxt01;
+            window.sketch01 = that.sketch01;
+
+            that.updated_value = 0
+            that.is_mouse_down = false;
+            that.mouseXYV = { X: 0, Y: 0, V:0 };
+
+            that.canvasDataToConsole = function() {
+                console.log("RUNNING: canvasDataToConsole");
+                var canvas01_data = that.model.get("canvas01_data");
+                var data_arr0 = canvas01_data.data
+                var data_rows = canvas01_data.shape[0]
+                var data_cols = canvas01_data.shape[1]
+                window.last_canvasDataToConsole_data_arr0 = data_arr0
+                window.last_canvasDataToConsole_data_cols = data_cols
+                window.last_canvasDataToConsole_data_rows = data_rows
+                var tmp_line = "np.array( [ "
+                console.log( tmp_line )
+                for ( var ii = 0; ii < data_rows; ii++ ) {
+                    tmp_line = "    [ ";
+                    for ( var jj = 0; jj < data_cols; jj++ ) {
+                        var tmp_index = ii*data_cols + jj;
+                        tmp_line = tmp_line + data_arr0[ tmp_index ];
+                        tmp_line = tmp_line + ", ";
+                    }
+                    tmp_line = tmp_line + "]," + " # " + ii;
+                    console.log( tmp_line )
+                }
+                tmp_line = "], )";
+                console.log( tmp_line )
+            };
+
+            that.canvasDataToHTML = function() {
+                console.log("RUNNING: canvasDataToHTML");
+                that.block_htmlized.innerHTML = "";
+                // that.block_htmlized.outerHTML = "";
+                var canvas01_data = that.model.get("canvas01_data");
+                var data_arr0 = canvas01_data.data
+                var data_rows = canvas01_data.shape[0]
+                var data_cols = canvas01_data.shape[1]
+                window.last_canvasDataToHTML_data_arr0 = data_arr0
+                window.last_canvasDataToHTML_data_cols = data_cols
+                window.last_canvasDataToHTML_data_rows = data_rows
+                var array_html = ">> np.array( [ <br />"
+                for ( var ii = 0; ii < data_rows; ii++ ) {
+                    array_html = array_html + "    [ ";
+                    for ( var jj = 0; jj < data_cols; jj++ ) {
+                        var tmp_index = ii*data_cols + jj;
+                        if (data_arr0[ tmp_index ] == 0) {
+                            array_html = array_html + "<span style=\"color: blue; \">";
+                        }
+                        else {
+                            array_html = array_html + "<span style=\"color: red; \">";
+                        }
+                        array_html = array_html + data_arr0[ tmp_index ];
+                        array_html = array_html + "</span>";
+                        array_html = array_html + ", ";
+                    }
+                    array_html = array_html + "],<br />";
+                }
+                array_html = array_html + "], )";
+                that.block_htmlized.innerHTML = array_html;
+            };
+
+            that.canvasDataToCanvas = function() {
+                console.log("RUNNING: canvasDataToCanvas()")
+                var pix_zoom = that.model.get("pix_zoom");
+                var canvas01_data = that.model.get("canvas01_data");
+                var data_arr0 = canvas01_data.data;
+                var data_rows = canvas01_data.shape[0];
+                var data_cols = canvas01_data.shape[1];
+                var canvas_hh = data_rows * pix_zoom;
+                var canvas_ww = data_cols * pix_zoom;
+
+                that.canvas01.width  = canvas_ww;
+                that.canvas01.height = canvas_hh;
+                that.contxt01.clearRect( 0, 0, canvas_ww, canvas_hh );
+
+                for ( var ii = 0; ii < data_rows; ii++ ) {
+                    for ( var jj = 0; jj < data_cols; jj++ ) {
+                        var tmp_index = ii*data_cols + jj;
+                        if (data_arr0[ tmp_index ] == 0) {
+                            that.contxt01.fillStyle = that.col_back;
+                        }
+                        else {
+                            that.contxt01.fillStyle = that.col_fore;
+                        }
+                        that.contxt01.fillRect( jj*pix_zoom, ii*pix_zoom, pix_zoom, pix_zoom );
+                    }
+                }
+                // grid: vertical
+                for ( var xx = 0; xx <= canvas_ww; xx += pix_zoom ) {
+                    that.contxt01.moveTo( 0.5 + xx + pix_zoom , 0         );
+                    that.contxt01.lineTo( 0.5 + xx + pix_zoom , canvas_hh );
+                }
+                // grid: horizontal
+                for ( var yy = 0; yy <= canvas_hh; yy += pix_zoom ) {
+                    that.contxt01.moveTo( 0         , 0.5 + yy + pix_zoom );
+                    that.contxt01.lineTo( canvas_ww , 0.5 + yy + pix_zoom );
+                }
+                that.contxt01.strokeStyle = that.col_grid;
+                that.contxt01.stroke();
+            };
+
+            that.canvasDataPointer = function(current_pix_orig) {
+                that.contxt01.fillStyle = that.col_curs;
+                var pix_zoom = that.model.get("pix_zoom");
+                var pnt_size = Math.ceil( pix_zoom/4 )
+                that.contxt01.fillRect( current_pix_orig.x-pnt_size, current_pix_orig.y-pnt_size, pnt_size, pnt_size );
+            };
+
+            that.getCanvasOrigPixel = function(ev) {
+                let x = ev.clientX;
+                let y = ev.clientY;
+                var bound = that.canvas01.getBoundingClientRect();
+                return {x: x-bound.left, y: y-bound.top};
+            };
+
+            that.getCanvasZoomPixel = function(ev) {
+                // TODO cleanup here (remove unnecessary variables)
+                var pix_zoom = that.model.get("pix_zoom");
+                var canvas01_data = that.model.get("canvas01_data");
+                var data_arr0 = canvas01_data.data;
+                var data_rows = canvas01_data.shape[0];
+                var data_cols = canvas01_data.shape[1];
+                var canvas_hh = data_rows * pix_zoom;
+                var canvas_ww = data_cols * pix_zoom;
+                let coords01 = that.getCanvasOrigPixel(ev);
+                var current_X_pos = Math.floor( (coords01.x-1) / pix_zoom );
+                var current_Y_pos = Math.floor( (coords01.y-1) / pix_zoom );
+                if (current_X_pos > data_cols -1) {
+                    current_X_pos = data_cols -1;
+                    console.log( "Correction: X too high!" );
+                }
+                if (current_Y_pos > data_rows -1) {
+                    current_Y_pos = data_rows -1;
+                    console.log( "Correction: Y too high!" );
+                }
+                if (current_X_pos < 0) {
+                    current_X_pos = 0;
+                    console.log( "Correction: X too low!" );
+                }
+                if (current_Y_pos < 0) {
+                    current_Y_pos = 0;
+                    console.log( "Correction: Y too low!" );
+                }
+                var tmp_index = current_Y_pos * data_cols + current_X_pos;
+                var current_value = data_arr0[ tmp_index ]
+                // console.log( "X=" + current_X_pos + "; Y=" + current_Y_pos + "; V=" + current_value );
+                return {X: current_X_pos, Y: current_Y_pos, V: current_value};
+            };
+
+            that.handleMouseDn = function(ev) {
+                console.log("RUNNING: handleMouseDn()")
+                // add here saving of most variables to "that"
+                // not to have to read them constantly during mouse move
+                that.is_mouse_down = true;
+                var pix_zoom = that.model.get("pix_zoom");
+                var canvas01_data_OLD = that.model.get("canvas01_data");
+                var data_arr0_NEW = canvas01_data_OLD.data.slice();
+                var data_cols = canvas01_data_OLD.shape[1];
+                let current_pix_orig = that.getCanvasOrigPixel(ev);
+                let current_pix_zoom = that.getCanvasZoomPixel(ev);
+                if ( current_pix_zoom.V == 0 ) {
+                    that.updated_value = 1;
+                }
+                else {
+                    that.updated_value = 0;
+                }
+                // TODO: only redraw and save_changes when the value was changed?
+                var tmp_index = current_pix_zoom.Y * data_cols + current_pix_zoom.X;
+                data_arr0_NEW[ tmp_index ] = that.updated_value;
+                var canvas01_data_NEW = { data: data_arr0_NEW, shape: canvas01_data_OLD.shape }
+                window.handleMouseDn_canvas01_data_OLD = canvas01_data_OLD;
+                window.handleMouseDn_canvas01_data_NEW = canvas01_data_NEW;
+                that.model.set({"canvas01_data":canvas01_data_NEW});
+                that.model.save_changes();
+                that.canvasDataToConsole();
+                that.canvasDataToHTML();
+                that.canvasDataToCanvas();
+            }
+
+            this.handleMouseMv = function(ev) {
+                // console.log("RUNNING: handleMouseMv()")
+                if (!this.is_mouse_down) { return; }
+                // var pix_zoom = that.model.get("pix_zoom");
+                var canvas01_data_OLD = that.model.get("canvas01_data");
+                var data_arr0_NEW = canvas01_data_OLD.data.slice();
+                var data_cols = canvas01_data_OLD.shape[1];
+                let current_pix_orig = this.getCanvasOrigPixel(ev);
+                let current_pix_zoom = this.getCanvasZoomPixel(ev);
+
+                var tmp_index = current_pix_zoom.Y * data_cols + current_pix_zoom.X;
+                data_arr0_NEW[ tmp_index ] = that.updated_value;
+                var canvas01_data_NEW = { data: data_arr0_NEW, shape: canvas01_data_OLD.shape }
+                window.handleMouseMv_canvas01_data_OLD = canvas01_data_OLD;
+                window.handleMouseMv_canvas01_data_NEW = canvas01_data_NEW;
+                that.model.set({"canvas01_data":canvas01_data_NEW});
+                that.model.save_changes();
+                // that.canvasDataToConsole();
+                that.canvasDataToHTML();
+                that.canvasDataToCanvas();
+                this.canvasDataPointer(current_pix_orig);
+            }
+
+            this.handleMouseUp = function(ev) {
+                console.log("RUNNING: handleMouseUp()")
+                this.is_mouse_down = false;
+                that.canvasDataToConsole();
+                that.canvasDataToHTML();
+                that.canvasDataToCanvas();
+            }
+
+            this.handleMouseOu = function(ev) {
+                console.log("RUNNING: handleMouseUp()")
+                this.is_mouse_down = false;
+                that.canvasDataToConsole();
+                that.canvasDataToHTML();
+                that.canvasDataToCanvas();
+            }
+
+            that.canvas01.addEventListener("mousedown", ev => that.handleMouseDn(ev), false );
+            that.canvas01.addEventListener("mousemove", ev => that.handleMouseMv(ev), false );
+            that.canvas01.addEventListener("mouseup",   ev => that.handleMouseUp(ev), false );
+            // that.canvas01.addEventListener("mouseout",  ev => that.handleMouseOu(ev), false );
+
+            that.canvasDataToCanvas();
+            that.canvasDataToHTML();
+            that.canvasDataToConsole();
+
+            window.that = that;
+
+
+            ///////////////////////////////////////////////
+            //
+            //  $$$$$$$\   $$$$$$\  $$\      $$\
+            //  $$  __$$\ $$  __$$\ $$$\    $$$ |
+            //  $$ |  $$ |$$ /  $$ |$$$$\  $$$$ |
+            //  $$ |  $$ |$$ |  $$ |$$\$$\$$ $$ |
+            //  $$ |  $$ |$$ |  $$ |$$ \$$$  $$ |
+            //  $$ |  $$ |$$ |  $$ |$$ |\$  /$$ |
+            //  $$$$$$$  | $$$$$$  |$$ | \_/ $$ |
+            //  \_______/  \______/ \__|     \__|
+            //
+            //
+
+
+            this.block_canvas01.appendChild(this.canvas01);
+
+
+            this.block_pix_zoom.appendChild(this.label_pix_zoom);
+            this.block_pix_zoom.appendChild(this.input_pix_zoom);
+            this.block_controls.appendChild(this.block_pix_zoom);
+
+            this.block_auxItems.appendChild(this.block_htmlized);
+            this.block_auxItems.appendChild(this.block_controls);
+
+            this.sketch01.appendChild(this.block_canvas01);
+            this.sketch01.appendChild(this.block_auxItems);
+
+            this.el.appendChild(this.sketch01)
+
+
+            ///////////////////////////////////////////////
+            //
+            //   $$$$$$\  $$\
+            //  $$  __$$\ $$ |
+            //  $$ /  \__|$$$$$$$\   $$$$$$\  $$$$$$$\   $$$$$$\   $$$$$$\
+            //  $$ |      $$  __$$\  \____$$\ $$  __$$\ $$  __$$\ $$  __$$\
+            //  $$ |      $$ |  $$ | $$$$$$$ |$$ |  $$ |$$ /  $$ |$$$$$$$$ |
+            //  $$ |  $$\ $$ |  $$ |$$  __$$ |$$ |  $$ |$$ |  $$ |$$   ____|
+            //  \$$$$$$  |$$ |  $$ |\$$$$$$$ |$$ |  $$ |\$$$$$$$ |\$$$$$$$\
+            //   \______/ \__|  \__| \_______|\__|  \__| \____$$ | \_______|
+            //                                          $$\   $$ |
+            //                                          \$$$$$$  |
+            //                                           \______/
+
+
+            // pix_zoom changes
+            this.model.on("change:pix_zoom", this.pix_zoom_changed_from_py, this);
+            this.input_pix_zoom.onchange = this.pix_zoom_changed_from_js.bind(this);
+
+            // canvas01_data changes
+            this.canvas01_data_changed_from_py()
+            this.model.on("change:canvas01_data", this.canvas01_data_changed_from_py, this);
+
+            console.log(this.model);
+
+        },
+        pix_zoom_changed_from_py: function() {
+            console.log("RUNNING: pix_zoom_changed_from_py()")
+            this.input_pix_zoom.value = this.model.get("pix_zoom");
+            this.canvasDataToCanvas();
+            // this.renewCanvasDimensions();
+            // this.writeCanvasContentToConsole();
+            // this.canvasDataToHTML();
+            // this.clearAndReDrawCanvas();
+            // this.drawCanvasContent();
+        },
+        pix_zoom_changed_from_js: function() {
+            console.log("RUNNING: pix_zoom_changed_from_js()")
+            this.model.set("pix_zoom", parseInt( this.input_pix_zoom.value, 10 ));
+            this.model.save_changes();
+            this.canvasDataToCanvas();
+            // this.renewCanvasDimensions();
+            // this.drawCanvasContent();
+            // this.canvas01_data_changed_from_js.bind(this);
+        },
+        canvas01_data_changed_from_py: function() {
+            console.log("RUNNING: canvas01_data_changed_from_py()")
+            // var canvas01_data = this.model.get("canvas01_data");
+            that.canvasDataToHTML();
+            this.canvasDataToCanvas();
+            // this.renewCanvasDimensions();
+            // this.writeCanvasContentToConsole();
+            // this.canvasDataToHTML();
+            // this.clearAndReDrawCanvas();
+            // this.drawCanvasContent();
+        },
+
+    });
+
+
+    return {
+        DrawningModel: DrawningModel,
+        DrawningView:  DrawningView,
+    };
+})
+
+  #+END_SRC
+
+* Initialize widget instance
+
+  Clicking on the squares will alter the values of the =inst.canvas01_data=.
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst = DrawningPad( pix_zoom=32 )
+inst
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.rot90()
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+print(inst.canvas01_data)
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.clear( 7, 7, )
+inst
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.checkerboard()
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+print(inst.pix_zoom)
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.pix_zoom = 36
+inst.pix_zoom = inst.pix_zoom +18
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.pix_zoom = 36
+inst.pix_zoom = inst.pix_zoom -18
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.test()
+inst
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.roll( 1, 0, )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.roll( 0, 1, )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.rot90( )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.flipud( )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.fliplr( )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.transpose( )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.test()
+inst
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.swap( )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.noisify( gridVal=0 )
+
+  #+END_SRC
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.noisify( gridVal=1 )
+
+  #+END_SRC
+
+
+* Extra controls
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+from IPython.display import display
+from ipywidgets import IntSlider
+from ipywidgets import Button
+from ipywidgets import Layout, HBox, VBox
+
+int_range = IntSlider(
+    value=36,
+    min=8,
+    max=128,
+    step=1,
+    description='Test:',
+    disabled=False,
+    continuous_update=True,
+    orientation='horizontal',
+    readout=True,
+    readout_format='d',
+)
+
+words = [
+    "↺", "▲", "⬕", "⬌", "⬍", "T",
+    "◄", "▼", "►", "0", "1", "2",
+]
+items = [ Button( description=w, layout=Layout( width='48px', height='32px' ) ) for w in words ]
+ctrl = VBox( [
+    HBox( [ items[0], items[1],  items[2], items[3], items[4],  items[5],  ], ),
+    HBox( [ items[6], items[7],  items[8], items[9], items[10], items[11], ], ),
+])
+
+functions = {}
+def tmp_fun(b): inst.rot90()
+functions[0] = tmp_fun
+def tmp_fun(b): inst.roll(  0, -1, )
+functions[1] = tmp_fun
+def tmp_fun(b): inst.swap()
+functions[2] = tmp_fun
+def tmp_fun(b): inst.fliplr( )
+functions[3] = tmp_fun
+def tmp_fun(b): inst.flipud( )
+functions[4] = tmp_fun
+def tmp_fun(b): inst.transpose( )
+functions[5] = tmp_fun
+def tmp_fun(b): inst.roll( -1,  0, )
+functions[6] = tmp_fun
+def tmp_fun(b): inst.roll(  0,  1, )
+functions[7] = tmp_fun
+def tmp_fun(b): inst.roll(  1,  0, )
+functions[8] = tmp_fun
+def tmp_fun(b): inst.noisify( gridVal=0 )
+functions[9] = tmp_fun
+def tmp_fun(b): inst.noisify( gridVal=1 )
+functions[10] = tmp_fun
+def tmp_fun(b):  inst.noisify( gridVal=0 ); inst.noisify( gridVal=1 )
+functions[11] = tmp_fun
+
+items[0].on_click(functions[0])
+items[1].on_click(functions[1])
+items[2].on_click(functions[2])
+items[3].on_click(functions[3])
+items[4].on_click(functions[4])
+items[5].on_click(functions[5])
+items[6].on_click(functions[6])
+items[7].on_click(functions[7])
+items[8].on_click(functions[8])
+items[9].on_click(functions[9])
+items[10].on_click(functions[10])
+items[11].on_click(functions[11])
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+inst.test()
+display(inst)
+display(ctrl)
+
+  #+END_SRC
