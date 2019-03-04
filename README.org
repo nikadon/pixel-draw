@@ -1,6 +1,6 @@
 
 
-Pixel Draw-n-ing Pad
+Pixel Drawing Pad
 
 
 [[./pixel_drawing_pad.gif]]
