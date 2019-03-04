@@ -2,64 +2,72 @@
 #+AUTHOR: JN, KR
 
 
-* Code
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+* TODO TODO
 
-from ipywidgets import Widget
-Widget.close_all()
+  - [ ] add additional controls class that extends on the widget
+    (stores an instance of the pixel-drawing-pad widget).
+
+* Implementation
+** Imports
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 from __future__ import print_function
-from traitlets import Integer, Unicode, Bool, validate, TraitError, List
-from ipywidgets import widgets, DOMWidget, register
+from __future__ import division
 
-import numpy as np
+from ipywidgets import widgets
+from ipywidgets import Widget
+from ipywidgets import DOMWidget
+from ipywidgets import register
+
+from traitlets import Unicode
+from traitlets import Integer
+from traitlets import Float
+from traitlets import List
+from traitlets import Bool
+from traitlets import validate
+from traitlets import TraitError
 
 from traittypes import Array
 
-  #+END_SRC
-
-
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-import ipywidgets as widgets
-from traitlets import Unicode, Float, List
-
 from copy import deepcopy
 
-  #+END_SRC
+import numpy as np
 
+Widget.close_all()
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+   #+END_SRC
 
-def from_json(value, obj=None):
-    return []
+** Serialization
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 def array_to_binary(ar, obj=None):
     if ar is not None:
         ar = ar.astype(np.float32)
         mv = memoryview(ar)
-        return {"data": mv, "shape": ar.shape}
+        return { "data": mv, "shape": ar.shape }
     else:
         return None
 
-last_value = None
-setters = 0
+bin2arr_recent = None
+bin2arr_counts = 0
 
 def binary_to_array(value, obj=None):
-    global last_value, setters
-    setters += 1
-    last_value = value # or keep a reference to a global for debugging
+    global bin2arr_recent
+    global bin2arr_counts
+    bin2arr_counts += 1
+    bin2arr_recent = value
     return np.frombuffer( value["data"], dtype=np.float32 ).reshape( value["shape"] )
 
+array_binary_serialization = dict( to_json=array_to_binary, from_json=binary_to_array )
 
-array_binary_serialization = dict(to_json=array_to_binary, from_json=binary_to_array)
+   #+END_SRC
 
-  #+END_SRC
+** DrawningPad widget
 
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 @widgets.register
 class DrawningPad(widgets.DOMWidget):
@@ -75,7 +83,7 @@ class DrawningPad(widgets.DOMWidget):
     canvas01_data_default = np.array( [
         [ 1, 1, 0, 0, 0, 0, 0, ],
         [ 1, 0, 0, 1, 0, 0, 0, ],
-        [ 0, 0, 1, 1, 1, 0, 0, ],
+        [ 1, 0, 1, 1, 1, 0, 0, ],
         [ 0, 0, 0, 1, 0, 0, 0, ],
         [ 0, 0, 1, 1, 1, 0, 0, ],
         [ 0, 0, 0, 1, 0, 0, 0, ],
@@ -99,50 +107,84 @@ class DrawningPad(widgets.DOMWidget):
 
     @validate("pix_zoom")
     def _valid_pix_zoom(self, proposal):
-        if proposal["value"] <= 8:
-            raise TraitError("Please ensure that 8 <= pix_zoom < 128")
-        if proposal["value"] > 128:
-            raise TraitError("Please ensure that 8 <= pix_zoom < 128")
+        if ( proposal["value"] < 8 ) or ( proposal["value"] > 128 ):
+            raise TraitError("Please ensure that: 8 <= pix_zoom <= 128")
         return proposal["value"]
 
 
-    def clear( self, w=7, h=7, ):
-        self.canvas01_data = np.zeros( (h,w) ).copy()
+    def clean( self, n_rows=None, n_cols=None, val=0, ):
+        if n_rows is None:
+            n_rows = self.canvas01_data.shape[0]
+        if n_cols is None:
+            n_cols = self.canvas01_data.shape[1]
 
-    def clean( self, w=7, h=7, ):
-        self.canvas01_data = np.zeros( (h,w) ).copy()
+        if val == 0:
+            self.canvas01_data = np.zeros( ( n_rows, n_cols ) ).copy()
+        elif val == 1:
+            self.canvas01_data = np.ones( ( n_rows, n_cols ) ).copy()
+        else:
+            self.canvas01_data = np.ones( ( n_rows, n_cols ) ).copy() * val
+
+
+    def clear( self, n_cols=None, n_rows=None, val=0, ):
+        self.clean( n_cols=n_cols, n_rows=n_rows, val=val, )
+
+
+    def checkerboard( self, n_rows=None, n_cols=None, ):
+        if n_rows is None:
+            n_rows = self.canvas01_data.shape[0]
+        if n_cols is None:
+            n_cols = self.canvas01_data.shape[1]
+
+        self.canvas01_data = np.array([[(x+y)%2 for x in range(n_cols)] for y in range(n_rows)])
+
 
     def test( self, ):
         self.canvas01_data = np.array( [
         [ 1, 1, 0, 0, 0, 0, 0, ],
         [ 1, 0, 0, 1, 0, 0, 0, ],
-        [ 0, 0, 1, 1, 1, 0, 0, ],
+        [ 1, 0, 1, 1, 1, 0, 0, ],
         [ 0, 0, 0, 1, 0, 0, 0, ],
         [ 0, 0, 1, 1, 1, 0, 0, ],
         [ 0, 0, 0, 1, 0, 0, 0, ],
         [ 0, 0, 0, 0, 0, 0, 0, ],
     ], )
 
+
+    def noisify( self, noise_value=1, noise_threshold=0.95 ):
+        mask = np.random.rand(*self.canvas01_data.shape)
+        tmp_data = self.canvas01_data.copy()
+        noise_threshold = 0.95
+        mask[mask >= noise_threshold] = 1
+        mask[mask <  noise_threshold] = 0
+        mask = mask.astype( np.bool )
+        tmp_data[mask] = noise_value
+        self.canvas01_data = tmp_data.copy()
+
+
     def roll( self, x=1, y=1, ):
         self.canvas01_data = np.roll( self.canvas01_data, x, axis=1, )
         self.canvas01_data = np.roll( self.canvas01_data, y, axis=0, )
 
-    def rot90( self ):
+    def rot90( self, ):
         self.canvas01_data = np.rot90( self.canvas01_data, k=1 , axes=(0, 1), ).copy()
 
-    def flipud( self ):
+    def flipud( self, ):
         self.canvas01_data = np.flipud( self.canvas01_data, )
 
-    def fliplr( self ):
+    def fliplr( self, ):
         self.canvas01_data = np.fliplr( self.canvas01_data, )
 
     def transpose( self ):
         self.canvas01_data = np.transpose( self.canvas01_data, ).copy()
 
-    def checkerboard( self, nRows=7, nCols=7, ):
-        self.canvas01_data = np.array([[(x+y)%2 for x in range(nCols)] for y in range(nRows)]).copy()
+    def insert( self, x, y, val, ):
+        data = self.canvas01_data.copy()
+        data[ x, y ] = val
+        self.canvas01_data = data.copy()
+        """TODO Add feature of swaping value if explicitly not specified"""
 
-    def swap( self ):
+    def swap( self, ):
         data = self.canvas01_data.copy()
         for ii, row in enumerate(data):
             for jj, elem in enumerate(row):
@@ -153,21 +195,14 @@ class DrawningPad(widgets.DOMWidget):
                 else:
                     pass
         self.canvas01_data = data.copy()
+        """TODO Add feature of swapping sub-range on x and y"""
+        """TODO CONSIDER Swap to 0 or -val ???"""
 
-    def noisify( self, gridVal=1 ):
-        mask = np.random.rand(*self.canvas01_data.shape)
-        data = self.canvas01_data.copy()
-        thresh = 0.95
-        mask[mask >= thresh] = 1
-        mask[mask <  thresh] = 0
-        mask = mask.astype( np.bool )
-        data[mask] = gridVal
-        self.canvas01_data = data.copy()
+   #+END_SRC
 
-  #+END_SRC
+** JavaScript
 
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 %%javascript
 require.undef("jupyter-drawning-pad")
@@ -321,9 +356,13 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
                 background-color: silver; \
                 ";
 
-            // /////////////////////////////////////////////
+            ///////////////////////////////////////////////
+            //
+            // that = this
+            //
+            ///////////////////////////////////////////////
+
             var that = this;
-            // /////////////////////////////////////////////
 
             that.col_fore = "#a6e22e";
             that.col_back = "#663399";
@@ -403,23 +442,33 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
                 var data_arr0 = canvas01_data.data;
                 var data_rows = canvas01_data.shape[0];
                 var data_cols = canvas01_data.shape[1];
-                var canvas_hh = data_rows * pix_zoom;
-                var canvas_ww = data_cols * pix_zoom;
+                var canvas_hh = parseInt( Math.ceil( data_rows * pix_zoom ), 10 );
+                var canvas_ww = parseInt( Math.ceil( data_cols * pix_zoom ), 10 );
 
                 that.canvas01.width  = canvas_ww;
                 that.canvas01.height = canvas_hh;
                 that.contxt01.clearRect( 0, 0, canvas_ww, canvas_hh );
 
+                // DEBUGGING ONLY
+                // that.contxt01.fillStyle = "red";
+                // that.contxt01.fillRect(-10, -10, canvas_ww+10, canvas_hh+10 );
+
                 for ( var ii = 0; ii < data_rows; ii++ ) {
                     for ( var jj = 0; jj < data_cols; jj++ ) {
                         var tmp_index = ii*data_cols + jj;
-                        if (data_arr0[ tmp_index ] == 0) {
+                        if (data_arr0[ tmp_index ] <= 0) {
                             that.contxt01.fillStyle = that.col_back;
                         }
                         else {
                             that.contxt01.fillStyle = that.col_fore;
+                            // DEBUGGING ONLY
+                            // that.contxt01.fillStyle = "rgba(255, 255, 255, 0.5)";
                         }
-                        that.contxt01.fillRect( jj*pix_zoom, ii*pix_zoom, pix_zoom, pix_zoom );
+                        var tmp_x = parseInt( Math.ceil( jj*pix_zoom ), 10 )
+                        var tmp_y = parseInt( Math.ceil( ii*pix_zoom ), 10 )
+                        var tmp_w = parseInt( Math.ceil( pix_zoom ), 10 )
+                        var tmp_h = parseInt( Math.ceil( pix_zoom ), 10 )
+                        that.contxt01.fillRect( tmp_x, tmp_y, tmp_w, tmp_h );
                     }
                 }
                 // grid: vertical
@@ -433,6 +482,7 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
                     that.contxt01.lineTo( canvas_ww , 0.5 + yy + pix_zoom );
                 }
                 that.contxt01.strokeStyle = that.col_grid;
+                that.contxt01.lineWidth = 1;
                 that.contxt01.stroke();
             };
 
@@ -483,6 +533,13 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
                 // console.log( "X=" + current_X_pos + "; Y=" + current_Y_pos + "; V=" + current_value );
                 return {X: current_X_pos, Y: current_Y_pos, V: current_value};
             };
+
+
+            ///////////////////////////////////////////////
+            //
+            // Handle mouse events
+            //
+            ///////////////////////////////////////////////
 
             that.handleMouseDn = function(ev) {
                 console.log("RUNNING: handleMouseDn()")
@@ -558,6 +615,13 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
             that.canvas01.addEventListener("mouseup",   ev => that.handleMouseUp(ev), false );
             // that.canvas01.addEventListener("mouseout",  ev => that.handleMouseOu(ev), false );
 
+
+            ///////////////////////////////////////////////
+            //
+            // Initialize
+            //
+            ///////////////////////////////////////////////
+
             that.canvasDataToCanvas();
             that.canvasDataToHTML();
             that.canvasDataToConsole();
@@ -567,20 +631,11 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
 
             ///////////////////////////////////////////////
             //
-            //  $$$$$$$\   $$$$$$\  $$\      $$\
-            //  $$  __$$\ $$  __$$\ $$$\    $$$ |
-            //  $$ |  $$ |$$ /  $$ |$$$$\  $$$$ |
-            //  $$ |  $$ |$$ |  $$ |$$\$$\$$ $$ |
-            //  $$ |  $$ |$$ |  $$ |$$ \$$$  $$ |
-            //  $$ |  $$ |$$ |  $$ |$$ |\$  /$$ |
-            //  $$$$$$$  | $$$$$$  |$$ | \_/ $$ |
-            //  \_______/  \______/ \__|     \__|
+            // Append DOM elements
             //
-            //
-
+            ///////////////////////////////////////////////
 
             this.block_canvas01.appendChild(this.canvas01);
-
 
             this.block_pix_zoom.appendChild(this.label_pix_zoom);
             this.block_pix_zoom.appendChild(this.input_pix_zoom);
@@ -589,26 +644,17 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
             this.block_auxItems.appendChild(this.block_htmlized);
             this.block_auxItems.appendChild(this.block_controls);
 
-            this.sketch01.appendChild(this.block_canvas01);
             this.sketch01.appendChild(this.block_auxItems);
+            this.sketch01.appendChild(this.block_canvas01);
 
             this.el.appendChild(this.sketch01)
 
 
             ///////////////////////////////////////////////
             //
-            //   $$$$$$\  $$\
-            //  $$  __$$\ $$ |
-            //  $$ /  \__|$$$$$$$\   $$$$$$\  $$$$$$$\   $$$$$$\   $$$$$$\
-            //  $$ |      $$  __$$\  \____$$\ $$  __$$\ $$  __$$\ $$  __$$\
-            //  $$ |      $$ |  $$ | $$$$$$$ |$$ |  $$ |$$ /  $$ |$$$$$$$$ |
-            //  $$ |  $$\ $$ |  $$ |$$  __$$ |$$ |  $$ |$$ |  $$ |$$   ____|
-            //  \$$$$$$  |$$ |  $$ |\$$$$$$$ |$$ |  $$ |\$$$$$$$ |\$$$$$$$\
-            //   \______/ \__|  \__| \_______|\__|  \__| \____$$ | \_______|
-            //                                          $$\   $$ |
-            //                                          \$$$$$$  |
-            //                                           \______/
-
+            // Handle value changes
+            //
+            ///////////////////////////////////////////////
 
             // pix_zoom changes
             this.model.on("change:pix_zoom", this.pix_zoom_changed_from_py, this);
@@ -661,143 +707,130 @@ define("jupyter-drawning-pad", ["@jupyter-widgets/base", ], function(widgets) {
     };
 })
 
-  #+END_SRC
+   #+END_SRC
 
 * Initialize widget instance
+** Drawing demo
 
-  Clicking on the squares will alter the values of the =inst.canvas01_data=.
+   Clicking on the squares will alter the values of the =inst.canvas01_data=.
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-inst = DrawningPad( pix_zoom=32 )
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst = DrawningPad( pix_zoom=36 )
 inst
+   #+END_SRC
 
-  #+END_SRC
+** Zoom
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-inst.rot90()
-
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-print(inst.canvas01_data)
-
-  #+END_SRC
-
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.test()
 inst
+   #+END_SRC
 
-  #+END_SRC
-
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-inst.clear( 7, 7, )
-inst
-
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-inst.checkerboard()
-
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-print(inst.pix_zoom)
-
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.pix_zoom = 36
 inst.pix_zoom = inst.pix_zoom +18
+   #+END_SRC
 
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.pix_zoom = 36
 inst.pix_zoom = inst.pix_zoom -18
+   #+END_SRC
 
-  #+END_SRC
+** rot90
 
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.test()
 inst
+   #+END_SRC
 
-  #+END_SRC
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.rot90()
+   #+END_SRC
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+print(inst.canvas01_data)
+   #+END_SRC
 
+** Clear
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.test()
+inst
+   #+END_SRC
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.clear( 7, 7, )
+   #+END_SRC
+
+** Checkerboard
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.test()
+inst
+   #+END_SRC
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.checkerboard()
+   #+END_SRC
+
+** Roll, flip and transpose
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.test()
+inst
+   #+END_SRC
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.roll( 1, 0, )
+   #+END_SRC
 
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.roll( 0, 1, )
+   #+END_SRC
 
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
-inst.rot90( )
-
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.flipud( )
+   #+END_SRC
 
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.fliplr( )
+   #+END_SRC
 
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.transpose( )
+   #+END_SRC
 
-  #+END_SRC
+** Swap
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.test()
 inst
+   #+END_SRC
 
-  #+END_SRC
-
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
-
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 inst.swap( )
+   #+END_SRC
 
-  #+END_SRC
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.swap( )
+   #+END_SRC
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+** Add noise
 
-inst.noisify( gridVal=0 )
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.test()
+inst
+   #+END_SRC
 
-  #+END_SRC
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.noisify( noise_value=0 )
+   #+END_SRC
 
-  #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst.noisify( noise_value=1 )
+   #+END_SRC
 
-inst.noisify( gridVal=1 )
-
-  #+END_SRC
-
-
-* TODO Extra controls
+* Extra controls
 
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
@@ -819,41 +852,50 @@ int_range = IntSlider(
     readout_format='d',
 )
 
-words = [
-    "↺", "▲", "⬕", "⬌", "⬍", "T",
-    "◄", "▼", "►", "0", "1", "2",
+tooltips= [
+    "Rotate CCW", "Roll up",   "Swap 0/1",   "Flip left/right", "Flip up/down", "Transpose",         "Clean 0",
+    "Roll left",  "Roll down", "Roll right", "Add 0 noise",     "Add 1 noise",  "Add 0 and 1 noise", "Clean 1",
 ]
-items = [ Button( description=w, layout=Layout( width='48px', height='32px' ) ) for w in words ]
+words = [
+    "↺", "▲", "⬕", "⬌",  "⬍",  "T",  "□",
+    "◄", "▼", "►", "n0", "n1", "n2", "■",
+]
+items = [ Button( description=w, tooltip=t, layout=Layout( width='48px', height='32px' ) ) for w,t in zip(words,tooltips) ]
+# items = [ Button( description=w, layout=Layout( width='48px', height='32px' ) ) for w in words ]
 ctrl = VBox( [
-    HBox( [ items[0], items[1],  items[2], items[3], items[4],  items[5],  ], ),
-    HBox( [ items[6], items[7],  items[8], items[9], items[10], items[11], ], ),
+    HBox( [ items[0], items[1], items[2], items[3],  items[4],  items[5],  items[6],  ], ),
+    HBox( [ items[7], items[8], items[9], items[10], items[11], items[12], items[13], ], ),
 ])
-
 functions = {}
+tmp_item = -1
 def tmp_fun(b): inst.rot90()
-functions[0] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.roll(  0, -1, )
-functions[1] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.swap()
-functions[2] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.fliplr( )
-functions[3] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.flipud( )
-functions[4] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.transpose( )
-functions[5] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
+def tmp_fun(b):  inst.clean( val=0, )
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.roll( -1,  0, )
-functions[6] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.roll(  0,  1, )
-functions[7] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
 def tmp_fun(b): inst.roll(  1,  0, )
-functions[8] = tmp_fun
-def tmp_fun(b): inst.noisify( gridVal=0 )
-functions[9] = tmp_fun
-def tmp_fun(b): inst.noisify( gridVal=1 )
-functions[10] = tmp_fun
-def tmp_fun(b):  inst.noisify( gridVal=0 ); inst.noisify( gridVal=1 )
-functions[11] = tmp_fun
+tmp_item += 1; functions[tmp_item] = tmp_fun
+def tmp_fun(b): inst.noisify( noise_value=0 )
+tmp_item += 1; functions[tmp_item] = tmp_fun
+def tmp_fun(b): inst.noisify( noise_value=1 )
+tmp_item += 1; functions[tmp_item] = tmp_fun
+def tmp_fun(b):  inst.noisify( noise_value=0, noise_threshold=0.90 ); inst.noisify( noise_value=1, noise_threshold=0.90 )
+tmp_item += 1; functions[tmp_item] = tmp_fun
+def tmp_fun(b):  inst.clean( val=1, )
+tmp_item += 1; functions[tmp_item] = tmp_fun
 
 items[0].on_click(functions[0])
 items[1].on_click(functions[1])
@@ -867,6 +909,8 @@ items[8].on_click(functions[8])
 items[9].on_click(functions[9])
 items[10].on_click(functions[10])
 items[11].on_click(functions[11])
+items[12].on_click(functions[12])
+items[13].on_click(functions[13])
 
   #+END_SRC
 
@@ -874,12 +918,61 @@ items[11].on_click(functions[11])
   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
 
 inst.test()
-display(inst)
-display(ctrl)
+display(HBox([inst, ctrl]))
 
   #+END_SRC
-* Comments
 
-  TODO:
-  - Update of the HTML np.array view is working only on the most recent display of the widget
-  - Key strokes handling (js/html side) for arrows and basic functionalities
+
+* Capture
+
+   #+BEGIN_EXAMPLE
+ 
+   #+END_EXAMPLE
+
+** Pixel Drawing Pad
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+inst = DrawningPad( pix_zoom=32, )
+inst
+   #+END_SRC
+
+   #+BEGIN_SRC ipython :session *iPython* :eval yes :results raw drawer :exports both :shebang "#!/usr/bin/env ipython\n# -*- coding: utf-8 -*-\n\n" :tangle yes
+
+   #+END_SRC
+
+   #+BEGIN_EXAMPLE
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+   #+END_EXAMPLE
